@@ -331,7 +331,44 @@ h3 {
 }
 
 .upload-card {
+  display: grid;
+  gap: 14px;
   min-height: 248px;
+}
+
+.upload-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.upload-fields label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.upload-fields input,
+.upload-fields textarea {
+  width: 100%;
+  padding: 12px 13px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 800;
+}
+
+.upload-fields input {
+  min-height: 48px;
+}
+
+.upload-fields textarea {
+  min-height: 104px;
+  resize: vertical;
 }
 
 .gallery-input {
@@ -435,8 +472,6 @@ h3 {
 }
 
 .gallery-photo {
-  position: relative;
-  min-height: 172px;
   overflow: hidden;
   background: #fff;
   border: 1px solid var(--line);
@@ -446,25 +481,28 @@ h3 {
 
 .gallery-photo img {
   width: 100%;
-  height: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
 }
 
 .gallery-photo figcaption {
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
-  overflow: hidden;
-  padding: 7px 9px;
-  color: #fff;
-  background: rgba(6, 26, 60, 0.78);
-  border-radius: 8px;
-  font-size: 0.78rem;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.gallery-photo figcaption strong {
+  color: var(--navy);
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.gallery-photo figcaption p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
   font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
 }
 
 .admin-panel {
@@ -578,6 +616,22 @@ h3 {
   font-size: 0.9rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pending-author,
+.pending-message {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.pending-message {
+  min-height: 42px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
 .pending-actions {

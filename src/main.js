@@ -19,6 +19,8 @@ const units = {
 };
 const accessYear = document.querySelector("#accessYear");
 const galleryInput = document.querySelector("#galleryInput");
+const photoAuthorInput = document.querySelector("#photoAuthor");
+const photoMessageInput = document.querySelector("#photoMessage");
 const galleryPreview = document.querySelector("#galleryPreview");
 const uploadStatus = document.querySelector("#uploadStatus");
 const adminLoginForm = document.querySelector("#adminLoginForm");
@@ -98,8 +100,49 @@ function isAdminLoggedIn() {
   return localStorage.getItem(adminSessionKey) === "active";
 }
 
+function encodePhotoDetails(details) {
+  const json = JSON.stringify(details);
+  const bytes = new TextEncoder().encode(json);
+  const binary = [...bytes].map((byte) => String.fromCharCode(byte)).join("");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodePhotoDetails(encodedDetails) {
+  try {
+    const base64 = encodedDetails.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedBase64 = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const binary = atob(paddedBase64);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    return null;
+  }
+}
+
+function getStoredPhotoDetails(storedName) {
+  const parts = storedName.split("__");
+
+  if (parts.length >= 4) {
+    const details = decodePhotoDetails(parts[2]);
+
+    if (details) {
+      return {
+        author: details.author || "Convidado",
+        message: details.message || "",
+        fileName: parts.slice(3).join("__") || storedName,
+      };
+    }
+  }
+
+  return {
+    author: "",
+    message: "",
+    fileName: parts.slice(2).join("__") || storedName.split("-").slice(2).join("-") || storedName,
+  };
+}
+
 function getStoredPhotoName(storedName) {
-  return storedName.split("__").slice(2).join("__") || storedName.split("-").slice(2).join("-") || storedName;
+  return getStoredPhotoDetails(storedName).fileName;
 }
 
 function renderGalleryEmpty(title = "Nenhuma foto enviada ainda", message = "As primeiras memórias da festa aparecerão aqui.") {
@@ -111,7 +154,7 @@ function renderGalleryEmpty(title = "Nenhuma foto enviada ainda", message = "As 
   `;
 }
 
-function renderGalleryPhoto({ url, name }) {
+function renderGalleryPhoto({ url, name, author = "", message = "" }) {
   const figure = document.createElement("figure");
   figure.className = "gallery-photo";
 
@@ -120,7 +163,13 @@ function renderGalleryPhoto({ url, name }) {
   image.alt = `Foto enviada: ${name}`;
 
   const caption = document.createElement("figcaption");
-  caption.textContent = name;
+  const authorLabel = document.createElement("strong");
+  authorLabel.textContent = author || "Convidado";
+
+  const messageText = document.createElement("p");
+  messageText.textContent = message || name;
+
+  caption.append(authorLabel, messageText);
 
   figure.append(image, caption);
   galleryPreview.append(figure);
@@ -155,13 +204,14 @@ async function loadStoredGalleryPhotos() {
     .filter((item) => item.name && !item.name.endsWith("/"))
     .forEach((item) => {
       const { data: publicPhoto } = supabase.storage.from(supabaseBucket).getPublicUrl(`approved/${item.name}`);
-      renderGalleryPhoto({ url: publicPhoto.publicUrl, name: getStoredPhotoName(item.name) });
+      const details = getStoredPhotoDetails(item.name);
+      renderGalleryPhoto({ url: publicPhoto.publicUrl, name: details.fileName, author: details.author, message: details.message });
     });
 
   setUploadStatus("Galeria sincronizada com Supabase.", "success");
 }
 
-async function uploadGalleryPhotos(photos) {
+async function uploadGalleryPhotos(photos, details) {
   if (!supabase) {
     setUploadStatus("Prévia local: falta configurar VITE_SUPABASE_ANON_KEY.", "error");
     return false;
@@ -171,7 +221,8 @@ async function uploadGalleryPhotos(photos) {
 
   const uploads = photos.map(async (photo) => {
     const safeName = photo.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "-");
-    const path = `pending/${Date.now()}__${crypto.randomUUID()}__${safeName}`;
+    const encodedDetails = encodePhotoDetails(details);
+    const path = `pending/${Date.now()}__${crypto.randomUUID()}__${encodedDetails}__${safeName}`;
     const { error } = await supabase.storage.from(supabaseBucket).upload(path, photo, {
       cacheControl: "3600",
       upsert: false,
@@ -202,16 +253,25 @@ function renderPendingEmpty(message = "Nenhuma foto pendente no momento.") {
 }
 
 function renderPendingPhoto({ item, url }) {
+  const details = getStoredPhotoDetails(item.name);
   const figure = document.createElement("figure");
   figure.className = "pending-photo";
 
   const image = document.createElement("img");
   image.src = url;
-  image.alt = `Foto pendente: ${getStoredPhotoName(item.name)}`;
+  image.alt = `Foto pendente: ${details.fileName}`;
 
   const caption = document.createElement("figcaption");
   const name = document.createElement("strong");
-  name.textContent = getStoredPhotoName(item.name);
+  name.textContent = details.fileName;
+
+  const author = document.createElement("p");
+  author.className = "pending-author";
+  author.textContent = details.author ? `Autor: ${details.author}` : "Autor não informado";
+
+  const message = document.createElement("p");
+  message.className = "pending-message";
+  message.textContent = details.message || "Sem mensagem.";
 
   const actions = document.createElement("div");
   actions.className = "pending-actions";
@@ -229,7 +289,7 @@ function renderPendingPhoto({ item, url }) {
   rejectButton.addEventListener("click", () => rejectPendingPhoto(item.name));
 
   actions.append(approveButton, rejectButton);
-  caption.append(name, actions);
+  caption.append(name, author, message, actions);
   figure.append(image, caption);
   adminPending.append(figure);
 }
@@ -350,9 +410,21 @@ galleryInput.addEventListener("change", async () => {
   galleryPreview.replaceChildren();
 
   const selectedPhotos = [...galleryInput.files].filter((file) => file.type.startsWith("image/"));
+  const details = {
+    author: photoAuthorInput.value.trim().slice(0, 60),
+    message: photoMessageInput.value.trim().slice(0, 180),
+  };
 
   if (selectedPhotos.length === 0) {
     renderGalleryEmpty();
+    return;
+  }
+
+  if (!details.author) {
+    galleryInput.value = "";
+    renderGalleryEmpty();
+    setUploadStatus("Informe o autor das fotos antes de selecionar os arquivos.", "error");
+    photoAuthorInput.focus();
     return;
   }
 
@@ -360,11 +432,12 @@ galleryInput.addEventListener("change", async () => {
     const photoUrl = URL.createObjectURL(photo);
     galleryPhotoUrls.push(photoUrl);
 
-    renderGalleryPhoto({ url: photoUrl, name: photo.name });
+    renderGalleryPhoto({ url: photoUrl, name: photo.name, author: details.author, message: details.message });
   });
 
   try {
-    await uploadGalleryPhotos(selectedPhotos);
+    await uploadGalleryPhotos(selectedPhotos, details);
+    galleryInput.value = "";
   } catch (error) {
     setUploadStatus("Erro ao enviar. Confira as permissões do bucket no Supabase.", "error");
   }
