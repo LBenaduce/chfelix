@@ -8,7 +8,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabaseBucket = import.meta.env.VITE_SUPABASE_BUCKET || "guest-photos";
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 const adminUser = "CARLOSHENRIQUE";
-const adminPasswordHash = "58b280ad638a0097b9977081388183b6584012abdfa66c95eb7c1e97a8a9751b";
+const adminPasswordHash = "22ed5a7a4d808106ceedad5208b9d3c2915568b5c7bc6093389b43b8434e77e4";
 const adminSessionKey = "ch-gallery-admin";
 
 const units = {
@@ -326,30 +326,7 @@ function clearAdminSession() {
   setAdminStatus("Entre para revisar as fotos pendentes.");
 }
 
-async function shareInvite() {
-  const shareData = {
-    title: "CH 1 Ano",
-    text: "Você é nosso convidado para a festa CH 1 Ano, dia 18/07/2026 às 16h.",
-    url: window.location.href,
-  };
-
-  if (navigator.share) {
-    await navigator.share(shareData);
-    return;
-  }
-
-  await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
-  const shareButton = document.querySelector("#shareButton");
-  shareButton.textContent = "Link copiado";
-  setTimeout(() => {
-    shareButton.textContent = "Compartilhar convite";
-  }, 2200);
-}
-
 document.querySelector("#calendarButton").addEventListener("click", downloadCalendarInvite);
-document.querySelector("#shareButton").addEventListener("click", () => {
-  shareInvite().catch(() => {});
-});
 
 adminLoginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
