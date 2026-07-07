@@ -9,6 +9,9 @@ const units = {
   minutes: document.querySelector("#minutes"),
   seconds: document.querySelector("#seconds"),
 };
+const accessYear = document.querySelector("#accessYear");
+
+accessYear.textContent = new Date().getFullYear();
 
 function pad(value) {
   return String(value).padStart(2, "0");
