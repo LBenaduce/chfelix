@@ -409,7 +409,7 @@ h3 {
 .rsvp-section {
   background:
     linear-gradient(rgba(6, 26, 60, 0.88), rgba(6, 26, 60, 0.88)),
-    url("assets/decoracao-estadio-ch.jpeg") center / cover;
+    url("/assets/decoracao-estadio-ch.jpeg") center / cover;
   color: #fff;
 }
 

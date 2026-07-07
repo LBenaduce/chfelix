@@ -1,3 +1,5 @@
+import "./styles.css";
+
 const eventStart = new Date("2026-07-18T16:00:00-03:00");
 const eventEnd = new Date("2026-07-18T20:00:00-03:00");
 
