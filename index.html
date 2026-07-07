@@ -96,6 +96,31 @@
               <span>As primeiras memórias da festa aparecerão aqui.</span>
             </div>
           </div>
+
+          <div class="admin-panel" id="adminPanel">
+            <div class="admin-heading">
+              <div>
+                <p class="eyebrow">Área do admin</p>
+                <h3>Aprovar fotos enviadas</h3>
+              </div>
+              <button class="admin-logout" id="adminLogout" type="button" hidden>Sair</button>
+            </div>
+
+            <form class="admin-login" id="adminLoginForm">
+              <label>
+                <span>Login</span>
+                <input id="adminUser" type="text" autocomplete="username" placeholder="CARLOSHENRIQUE">
+              </label>
+              <label>
+                <span>Senha</span>
+                <input id="adminPassword" type="password" autocomplete="current-password" placeholder="Senha do admin">
+              </label>
+              <button class="button primary" type="submit">Entrar</button>
+            </form>
+
+            <p class="admin-status" id="adminStatus">Entre para revisar as fotos pendentes.</p>
+            <div class="admin-pending" id="adminPending" hidden></div>
+          </div>
         </div>
       </section>
 
