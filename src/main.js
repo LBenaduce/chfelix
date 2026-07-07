@@ -6,10 +6,9 @@ const eventEnd = new Date("2026-07-18T20:00:00-03:00");
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://mrhmxajrtswbhytlnhlg.supabase.co";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_3HBl9dvqUXvo3Y3ZlL360Q_Ipsten4g";
 const supabaseBucket = import.meta.env.VITE_SUPABASE_BUCKET || "guest-photos";
+const adminFunctionUrl = import.meta.env.VITE_SUPABASE_ADMIN_FUNCTION_URL || `${supabaseUrl}/functions/v1/gallery-admin`;
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 const adminUser = "CARLOSHENRIQUE";
-const adminPasswordHash = "22ed5a7a4d808106ceedad5208b9d3c2915568b5c7bc6093389b43b8434e77e4";
-const adminSessionKey = "ch-gallery-admin";
 
 const units = {
   days: document.querySelector("#days"),
@@ -30,6 +29,7 @@ const adminStatus = document.querySelector("#adminStatus");
 const adminPending = document.querySelector("#adminPending");
 const adminLogout = document.querySelector("#adminLogout");
 let galleryPhotoUrls = [];
+let adminCredentials = null;
 
 accessYear.textContent = new Date().getFullYear();
 
@@ -91,13 +91,8 @@ function setAdminStatus(message, state = "") {
   adminStatus.className = `admin-status${state ? ` is-${state}` : ""}`;
 }
 
-async function hashText(text) {
-  const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(hashBuffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
 function isAdminLoggedIn() {
-  return localStorage.getItem(adminSessionKey) === "active";
+  return Boolean(adminCredentials);
 }
 
 function encodePhotoDetails(details) {
@@ -200,13 +195,22 @@ async function loadStoredGalleryPhotos() {
     return;
   }
 
-  data
-    .filter((item) => item.name && !item.name.endsWith("/"))
-    .forEach((item) => {
-      const { data: publicPhoto } = supabase.storage.from(supabaseBucket).getPublicUrl(`approved/${item.name}`);
+  const approvedPhotos = data.filter((item) => item.name && !item.name.endsWith("/"));
+
+  await Promise.all(
+    approvedPhotos.map(async (item) => {
+      const { data: signedPhoto, error: signedError } = await supabase.storage
+        .from(supabaseBucket)
+        .createSignedUrl(`approved/${item.name}`, 3600);
+
+      if (signedError) {
+        return;
+      }
+
       const details = getStoredPhotoDetails(item.name);
-      renderGalleryPhoto({ url: publicPhoto.publicUrl, name: details.fileName, author: details.author, message: details.message });
-    });
+      renderGalleryPhoto({ url: signedPhoto.signedUrl, name: details.fileName, author: details.author, message: details.message });
+    }),
+  );
 
   setUploadStatus("Galeria sincronizada com Supabase.", "success");
 }
@@ -294,6 +298,50 @@ function renderPendingPhoto({ item, url }) {
   adminPending.append(figure);
 }
 
+async function callAdminFunction(payload, credentials = adminCredentials) {
+  if (!credentials) {
+    throw new Error("Admin desconectado.");
+  }
+
+  const response = await fetch(adminFunctionUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: supabaseAnonKey,
+    },
+    body: JSON.stringify({
+      ...payload,
+      bucket: supabaseBucket,
+      username: credentials.username,
+      password: credentials.password,
+    }),
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(result.error || "Falha na ação administrativa.");
+  }
+
+  return result;
+}
+
+function renderPendingPhotos(photos) {
+  adminPending.replaceChildren();
+
+  if (photos.length === 0) {
+    renderPendingEmpty();
+    setAdminStatus("Admin conectado. Sem fotos pendentes.", "success");
+    return;
+  }
+
+  photos.forEach((photo) => {
+    renderPendingPhoto({ item: { name: photo.name }, url: photo.url });
+  });
+
+  setAdminStatus(`${photos.length} foto${photos.length > 1 ? "s" : ""} aguardando aprovação.`, "success");
+}
+
 async function loadPendingPhotos() {
   if (!supabase || !isAdminLoggedIn()) {
     return;
@@ -301,83 +349,42 @@ async function loadPendingPhotos() {
 
   setAdminStatus("Carregando fotos pendentes...");
 
-  const { data, error } = await supabase.storage.from(supabaseBucket).list("pending", {
-    limit: 100,
-    sortBy: { column: "created_at", order: "desc" },
-  });
-
-  if (error) {
-    setAdminStatus("Não foi possível carregar as pendências.", "error");
+  try {
+    const { photos = [] } = await callAdminFunction({ action: "list" });
+    renderPendingPhotos(photos);
+  } catch (error) {
+    setAdminStatus(error.message || "Não foi possível carregar as pendências.", "error");
     renderPendingEmpty("Erro ao buscar fotos pendentes.");
-    return;
   }
-
-  adminPending.replaceChildren();
-
-  const pendingPhotos = (data || []).filter((item) => item.name && !item.name.endsWith("/"));
-
-  if (pendingPhotos.length === 0) {
-    renderPendingEmpty();
-    setAdminStatus("Admin conectado. Sem fotos pendentes.", "success");
-    return;
-  }
-
-  pendingPhotos.forEach((item) => {
-    const { data: pendingPhoto } = supabase.storage.from(supabaseBucket).getPublicUrl(`pending/${item.name}`);
-    renderPendingPhoto({ item, url: pendingPhoto.publicUrl });
-  });
-
-  setAdminStatus(`${pendingPhotos.length} foto${pendingPhotos.length > 1 ? "s" : ""} aguardando aprovação.`, "success");
 }
 
 async function approvePendingPhoto(name) {
   setAdminStatus("Aprovando foto...");
-  const source = `pending/${name}`;
-  const destination = `approved/${name}`;
-  const { error: copyError } = await supabase.storage.from(supabaseBucket).copy(source, destination);
 
-  if (copyError) {
-    setAdminStatus("Erro ao aprovar. Verifique as políticas de copy no bucket.", "error");
-    return;
-  }
-
-  const { error: removeError } = await supabase.storage.from(supabaseBucket).remove([source]);
-
-  if (removeError) {
-    setAdminStatus("Foto aprovada, mas não foi removida dos pendentes.", "error");
+  try {
+    await callAdminFunction({ action: "approve", name });
+    setAdminStatus("Foto aprovada e publicada.", "success");
     await loadStoredGalleryPhotos();
     await loadPendingPhotos();
-    return;
+  } catch (error) {
+    setAdminStatus(error.message || "Erro ao aprovar foto.", "error");
   }
-
-  setAdminStatus("Foto aprovada e publicada.", "success");
-  await loadStoredGalleryPhotos();
-  await loadPendingPhotos();
 }
 
 async function rejectPendingPhoto(name) {
   setAdminStatus("Reprovando foto...");
-  const { error } = await supabase.storage.from(supabaseBucket).remove([`pending/${name}`]);
 
-  if (error) {
-    setAdminStatus("Erro ao reprovar. Verifique as políticas de delete no bucket.", "error");
-    return;
+  try {
+    await callAdminFunction({ action: "reject", name });
+    setAdminStatus("Foto removida dos pendentes.", "success");
+    await loadPendingPhotos();
+  } catch (error) {
+    setAdminStatus(error.message || "Erro ao reprovar foto.", "error");
   }
-
-  setAdminStatus("Foto removida dos pendentes.", "success");
-  await loadPendingPhotos();
-}
-
-function showAdminSession() {
-  adminLoginForm.hidden = true;
-  adminLogout.hidden = false;
-  adminPending.hidden = false;
-  setAdminStatus("Admin conectado. Carregando pendências...", "success");
-  loadPendingPhotos();
 }
 
 function clearAdminSession() {
-  localStorage.removeItem(adminSessionKey);
+  adminCredentials = null;
   adminLoginForm.hidden = false;
   adminLogout.hidden = true;
   adminPending.hidden = true;
@@ -390,16 +397,29 @@ document.querySelector("#calendarButton").addEventListener("click", downloadCale
 
 adminLoginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const typedUser = adminUserInput.value.trim().toUpperCase();
-  const typedPasswordHash = await hashText(adminPasswordInput.value);
+  const credentials = {
+    username: adminUserInput.value.trim().toUpperCase(),
+    password: adminPasswordInput.value,
+  };
 
-  if (typedUser !== adminUser || typedPasswordHash !== adminPasswordHash) {
+  if (credentials.username !== adminUser) {
     setAdminStatus("Login ou senha inválidos.", "error");
     return;
   }
 
-  localStorage.setItem(adminSessionKey, "active");
-  showAdminSession();
+  setAdminStatus("Validando admin...");
+
+  try {
+    const { photos = [] } = await callAdminFunction({ action: "list" }, credentials);
+    adminCredentials = credentials;
+    adminLoginForm.hidden = true;
+    adminLogout.hidden = false;
+    adminPending.hidden = false;
+    renderPendingPhotos(photos);
+  } catch (error) {
+    adminCredentials = null;
+    setAdminStatus(error.message || "Login ou senha inválidos.", "error");
+  }
 });
 
 adminLogout.addEventListener("click", clearAdminSession);
@@ -444,8 +464,5 @@ galleryInput.addEventListener("change", async () => {
 });
 
 loadStoredGalleryPhotos();
-if (isAdminLoggedIn()) {
-  showAdminSession();
-}
 updateCountdown();
 setInterval(updateCountdown, 1000);
