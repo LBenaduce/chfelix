@@ -3,8 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 
 const eventStart = new Date("2026-07-18T16:00:00-03:00");
 const eventEnd = new Date("2026-07-18T20:00:00-03:00");
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://mrhmxajrtswbhytlnhlg.supabase.co";
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_3HBl9dvqUXvo3Y3ZlL360Q_Ipsten4g";
 const supabaseBucket = import.meta.env.VITE_SUPABASE_BUCKET || "guest-photos";
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 const adminUser = "CARLOSHENRIQUE";
