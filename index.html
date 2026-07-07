@@ -21,6 +21,7 @@
           <span>1 ano</span>
         </a>
         <div class="nav-actions">
+          <a href="#galeria">Galeria</a>
           <a href="#detalhes">Detalhes</a>
           <a href="#confirmar">Confirmar</a>
         </div>
@@ -65,6 +66,35 @@
         <div class="countdown-item">
           <strong id="seconds">00</strong>
           <span>Seg</span>
+        </div>
+      </section>
+
+      <section class="gallery-section" id="galeria">
+        <div class="gallery-panel">
+          <div class="gallery-copy">
+            <p class="eyebrow">Galeria da torcida</p>
+            <h2>Envie as fotos da festa</h2>
+            <p>
+              Registre os melhores lances do dia e deixe as lembranças do CH
+              reunidas em um só lugar.
+            </p>
+          </div>
+
+          <div class="upload-card">
+            <input class="gallery-input" id="galleryInput" type="file" accept="image/*" multiple>
+            <label class="upload-drop" for="galleryInput">
+              <span class="upload-icon" aria-hidden="true">+</span>
+              <strong>Selecionar fotos</strong>
+              <small>JPG, PNG ou HEIC</small>
+            </label>
+          </div>
+
+          <div class="gallery-preview" id="galleryPreview" aria-live="polite">
+            <div class="gallery-empty">
+              <strong>Nenhuma foto enviada ainda</strong>
+              <span>As primeiras memórias da festa aparecerão aqui.</span>
+            </div>
+          </div>
         </div>
       </section>
 

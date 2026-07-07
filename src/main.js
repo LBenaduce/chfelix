@@ -10,6 +10,9 @@ const units = {
   seconds: document.querySelector("#seconds"),
 };
 const accessYear = document.querySelector("#accessYear");
+const galleryInput = document.querySelector("#galleryInput");
+const galleryPreview = document.querySelector("#galleryPreview");
+let galleryPhotoUrls = [];
 
 accessYear.textContent = new Date().getFullYear();
 
@@ -84,6 +87,42 @@ async function shareInvite() {
 document.querySelector("#calendarButton").addEventListener("click", downloadCalendarInvite);
 document.querySelector("#shareButton").addEventListener("click", () => {
   shareInvite().catch(() => {});
+});
+
+galleryInput.addEventListener("change", () => {
+  galleryPhotoUrls.forEach((url) => URL.revokeObjectURL(url));
+  galleryPhotoUrls = [];
+  galleryPreview.replaceChildren();
+
+  const selectedPhotos = [...galleryInput.files].filter((file) => file.type.startsWith("image/"));
+
+  if (selectedPhotos.length === 0) {
+    galleryPreview.innerHTML = `
+      <div class="gallery-empty">
+        <strong>Nenhuma foto enviada ainda</strong>
+        <span>As primeiras memórias da festa aparecerão aqui.</span>
+      </div>
+    `;
+    return;
+  }
+
+  selectedPhotos.forEach((photo) => {
+    const photoUrl = URL.createObjectURL(photo);
+    galleryPhotoUrls.push(photoUrl);
+
+    const figure = document.createElement("figure");
+    figure.className = "gallery-photo";
+
+    const image = document.createElement("img");
+    image.src = photoUrl;
+    image.alt = `Foto enviada: ${photo.name}`;
+
+    const caption = document.createElement("figcaption");
+    caption.textContent = photo.name;
+
+    figure.append(image, caption);
+    galleryPreview.append(figure);
+  });
 });
 
 updateCountdown();
