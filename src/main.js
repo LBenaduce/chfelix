@@ -30,6 +30,7 @@ const adminPending = document.querySelector("#adminPending");
 const adminLogout = document.querySelector("#adminLogout");
 let galleryPhotoUrls = [];
 let adminCredentials = null;
+const videoExtensions = new Set(["mp4", "mov", "m4v", "webm", "ogg", "ogv"]);
 
 accessYear.textContent = new Date().getFullYear();
 
@@ -140,7 +141,41 @@ function getStoredPhotoName(storedName) {
   return getStoredPhotoDetails(storedName).fileName;
 }
 
-function renderGalleryEmpty(title = "Nenhuma foto enviada ainda", message = "As primeiras memórias da festa aparecerão aqui.") {
+function isVideoFileName(name = "") {
+  const extension = name.split(".").pop()?.toLowerCase() || "";
+  return videoExtensions.has(extension);
+}
+
+function isGalleryMedia(file) {
+  return file.type.startsWith("image/") || file.type.startsWith("video/");
+}
+
+function getMediaKind({ file, name = "" }) {
+  if (file?.type?.startsWith("video/") || isVideoFileName(name || file?.name)) {
+    return "video";
+  }
+
+  return "image";
+}
+
+function createMediaElement({ url, name, kind }) {
+  if (kind === "video") {
+    const video = document.createElement("video");
+    video.src = url;
+    video.controls = true;
+    video.preload = "metadata";
+    video.playsInline = true;
+    video.setAttribute("aria-label", `Vídeo enviado: ${name}`);
+    return video;
+  }
+
+  const image = document.createElement("img");
+  image.src = url;
+  image.alt = `Foto enviada: ${name}`;
+  return image;
+}
+
+function renderGalleryEmpty(title = "Nenhuma mídia enviada ainda", message = "As primeiras memórias da festa aparecerão aqui.") {
   galleryPreview.innerHTML = `
     <div class="gallery-empty">
       <strong>${title}</strong>
@@ -149,13 +184,11 @@ function renderGalleryEmpty(title = "Nenhuma foto enviada ainda", message = "As 
   `;
 }
 
-function renderGalleryPhoto({ url, name, author = "", message = "" }) {
+function renderGalleryPhoto({ url, name, author = "", message = "", kind = "image" }) {
   const figure = document.createElement("figure");
   figure.className = "gallery-photo";
 
-  const image = document.createElement("img");
-  image.src = url;
-  image.alt = `Foto enviada: ${name}`;
+  const media = createMediaElement({ url, name, kind });
 
   const caption = document.createElement("figcaption");
   const authorLabel = document.createElement("strong");
@@ -166,7 +199,7 @@ function renderGalleryPhoto({ url, name, author = "", message = "" }) {
 
   caption.append(authorLabel, messageText);
 
-  figure.append(image, caption);
+  figure.append(media, caption);
   galleryPreview.append(figure);
 }
 
@@ -191,7 +224,7 @@ async function loadStoredGalleryPhotos() {
 
   if (!data || data.length === 0) {
     renderGalleryEmpty();
-    setUploadStatus("Galeria pronta para receber fotos.", "success");
+    setUploadStatus("Galeria pronta para receber fotos e vídeos.", "success");
     return;
   }
 
@@ -208,7 +241,13 @@ async function loadStoredGalleryPhotos() {
       }
 
       const details = getStoredPhotoDetails(item.name);
-      renderGalleryPhoto({ url: signedPhoto.signedUrl, name: details.fileName, author: details.author, message: details.message });
+      renderGalleryPhoto({
+        url: signedPhoto.signedUrl,
+        name: details.fileName,
+        author: details.author,
+        message: details.message,
+        kind: getMediaKind({ name: details.fileName }),
+      });
     }),
   );
 
@@ -221,7 +260,7 @@ async function uploadGalleryPhotos(photos, details) {
     return false;
   }
 
-  setUploadStatus(`Enviando ${photos.length} foto${photos.length > 1 ? "s" : ""}...`);
+  setUploadStatus(`Enviando ${photos.length} mídia${photos.length > 1 ? "s" : ""}...`);
 
   const uploads = photos.map(async (photo) => {
     const safeName = photo.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -238,16 +277,16 @@ async function uploadGalleryPhotos(photos, details) {
   });
 
   await Promise.all(uploads);
-  setUploadStatus("Fotos enviadas. Elas aparecerão após aprovação do admin.", "success");
+  setUploadStatus("Mídias enviadas. Elas aparecerão após aprovação do admin.", "success");
   await loadStoredGalleryPhotos();
-  setUploadStatus("Fotos enviadas. Elas aparecerão após aprovação do admin.", "success");
+  setUploadStatus("Mídias enviadas. Elas aparecerão após aprovação do admin.", "success");
   if (isAdminLoggedIn()) {
     await loadPendingPhotos();
   }
   return true;
 }
 
-function renderPendingEmpty(message = "Nenhuma foto pendente no momento.") {
+function renderPendingEmpty(message = "Nenhuma mídia pendente no momento.") {
   adminPending.innerHTML = `
     <div class="gallery-empty">
       <strong>${message}</strong>
@@ -261,9 +300,11 @@ function renderPendingPhoto({ item, url }) {
   const figure = document.createElement("figure");
   figure.className = "pending-photo";
 
-  const image = document.createElement("img");
-  image.src = url;
-  image.alt = `Foto pendente: ${details.fileName}`;
+  const media = createMediaElement({
+    url,
+    name: details.fileName,
+    kind: getMediaKind({ name: details.fileName }),
+  });
 
   const caption = document.createElement("figcaption");
   const name = document.createElement("strong");
@@ -294,7 +335,7 @@ function renderPendingPhoto({ item, url }) {
 
   actions.append(approveButton, rejectButton);
   caption.append(name, author, message, actions);
-  figure.append(image, caption);
+  figure.append(media, caption);
   adminPending.append(figure);
 }
 
@@ -331,7 +372,7 @@ function renderPendingPhotos(photos) {
 
   if (photos.length === 0) {
     renderPendingEmpty();
-    setAdminStatus("Admin conectado. Sem fotos pendentes.", "success");
+    setAdminStatus("Admin conectado. Sem mídias pendentes.", "success");
     return;
   }
 
@@ -339,7 +380,7 @@ function renderPendingPhotos(photos) {
     renderPendingPhoto({ item: { name: photo.name }, url: photo.url });
   });
 
-  setAdminStatus(`${photos.length} foto${photos.length > 1 ? "s" : ""} aguardando aprovação.`, "success");
+  setAdminStatus(`${photos.length} mídia${photos.length > 1 ? "s" : ""} aguardando aprovação.`, "success");
 }
 
 async function loadPendingPhotos() {
@@ -347,39 +388,39 @@ async function loadPendingPhotos() {
     return;
   }
 
-  setAdminStatus("Carregando fotos pendentes...");
+  setAdminStatus("Carregando mídias pendentes...");
 
   try {
     const { photos = [] } = await callAdminFunction({ action: "list" });
     renderPendingPhotos(photos);
   } catch (error) {
     setAdminStatus(error.message || "Não foi possível carregar as pendências.", "error");
-    renderPendingEmpty("Erro ao buscar fotos pendentes.");
+    renderPendingEmpty("Erro ao buscar mídias pendentes.");
   }
 }
 
 async function approvePendingPhoto(name) {
-  setAdminStatus("Aprovando foto...");
+  setAdminStatus("Aprovando mídia...");
 
   try {
     await callAdminFunction({ action: "approve", name });
-    setAdminStatus("Foto aprovada e publicada.", "success");
+    setAdminStatus("Mídia aprovada e publicada.", "success");
     await loadStoredGalleryPhotos();
     await loadPendingPhotos();
   } catch (error) {
-    setAdminStatus(error.message || "Erro ao aprovar foto.", "error");
+    setAdminStatus(error.message || "Erro ao aprovar mídia.", "error");
   }
 }
 
 async function rejectPendingPhoto(name) {
-  setAdminStatus("Reprovando foto...");
+  setAdminStatus("Reprovando mídia...");
 
   try {
     await callAdminFunction({ action: "reject", name });
-    setAdminStatus("Foto removida dos pendentes.", "success");
+    setAdminStatus("Mídia removida dos pendentes.", "success");
     await loadPendingPhotos();
   } catch (error) {
-    setAdminStatus(error.message || "Erro ao reprovar foto.", "error");
+    setAdminStatus(error.message || "Erro ao reprovar mídia.", "error");
   }
 }
 
@@ -390,7 +431,7 @@ function clearAdminSession() {
   adminPending.hidden = true;
   adminPending.replaceChildren();
   adminPasswordInput.value = "";
-  setAdminStatus("Entre para revisar as fotos pendentes.");
+  setAdminStatus("Entre para revisar as mídias pendentes.");
 }
 
 document.querySelector("#calendarButton").addEventListener("click", downloadCalendarInvite);
@@ -429,7 +470,7 @@ galleryInput.addEventListener("change", async () => {
   galleryPhotoUrls = [];
   galleryPreview.replaceChildren();
 
-  const selectedPhotos = [...galleryInput.files].filter((file) => file.type.startsWith("image/"));
+  const selectedPhotos = [...galleryInput.files].filter(isGalleryMedia);
   const details = {
     author: photoAuthorInput.value.trim().slice(0, 60),
     message: photoMessageInput.value.trim().slice(0, 180),
@@ -443,7 +484,7 @@ galleryInput.addEventListener("change", async () => {
   if (!details.author) {
     galleryInput.value = "";
     renderGalleryEmpty();
-    setUploadStatus("Informe o autor das fotos antes de selecionar os arquivos.", "error");
+    setUploadStatus("Informe o autor das mídias antes de selecionar os arquivos.", "error");
     photoAuthorInput.focus();
     return;
   }
@@ -452,7 +493,13 @@ galleryInput.addEventListener("change", async () => {
     const photoUrl = URL.createObjectURL(photo);
     galleryPhotoUrls.push(photoUrl);
 
-    renderGalleryPhoto({ url: photoUrl, name: photo.name, author: details.author, message: details.message });
+    renderGalleryPhoto({
+      url: photoUrl,
+      name: photo.name,
+      author: details.author,
+      message: details.message,
+      kind: getMediaKind({ file: photo }),
+    });
   });
 
   try {

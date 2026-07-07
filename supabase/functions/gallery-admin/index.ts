@@ -104,7 +104,7 @@ Deno.serve(async (request) => {
   }
 
   if (!payload.name || !isSafePendingName(payload.name)) {
-    return jsonResponse({ error: "Nome de foto inválido." }, 400);
+    return jsonResponse({ error: "Nome de mídia inválido." }, 400);
   }
 
   const source = `pending/${payload.name}`;
@@ -114,13 +114,13 @@ Deno.serve(async (request) => {
     const { error: copyError } = await supabase.storage.from(bucket).copy(source, destination);
 
     if (copyError) {
-      return jsonResponse({ error: "Erro ao aprovar foto." }, 500);
+      return jsonResponse({ error: "Erro ao aprovar mídia." }, 500);
     }
 
     const { error: removeError } = await supabase.storage.from(bucket).remove([source]);
 
     if (removeError) {
-      return jsonResponse({ error: "Foto aprovada, mas não foi removida dos pendentes." }, 500);
+      return jsonResponse({ error: "Mídia aprovada, mas não foi removida dos pendentes." }, 500);
     }
 
     return jsonResponse({ ok: true });
@@ -130,7 +130,7 @@ Deno.serve(async (request) => {
     const { error } = await supabase.storage.from(bucket).remove([source]);
 
     if (error) {
-      return jsonResponse({ error: "Erro ao reprovar foto." }, 500);
+      return jsonResponse({ error: "Erro ao reprovar mídia." }, 500);
     }
 
     return jsonResponse({ ok: true });

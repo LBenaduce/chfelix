@@ -9,7 +9,7 @@ Run `supabase/storage-policies.sql` in the Supabase SQL editor.
 Expected behavior:
 - anonymous visitors can upload only to `pending/`
 - anonymous visitors can read only from `approved/`
-- only the `gallery-admin` Edge Function can list, approve, or reject pending photos
+- only the `gallery-admin` Edge Function can list, approve, or reject pending media
 
 ## Edge Function
 

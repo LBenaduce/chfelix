@@ -71,7 +71,7 @@
         <div class="gallery-panel">
           <div class="gallery-copy">
             <p class="eyebrow">Galeria da torcida</p>
-            <h2>Envie as fotos da festa</h2>
+            <h2>Envie fotos e vídeos da festa</h2>
             <p>
               Registre os melhores lances do dia e deixe as lembranças do CH
               reunidas em um só lugar.
@@ -81,7 +81,7 @@
           <div class="upload-card">
             <div class="upload-fields">
               <label>
-                <span>Autor das fotos</span>
+                <span>Autor das mídias</span>
                 <input id="photoAuthor" type="text" maxlength="60" placeholder="Seu nome" autocomplete="name">
               </label>
               <label>
@@ -89,18 +89,18 @@
                 <textarea id="photoMessage" maxlength="180" rows="4" placeholder="Escreva uma mensagem para o CH"></textarea>
               </label>
             </div>
-            <input class="gallery-input" id="galleryInput" type="file" accept="image/*" multiple>
+            <input class="gallery-input" id="galleryInput" type="file" accept="image/*,video/*" multiple>
             <label class="upload-drop" for="galleryInput">
               <span class="upload-icon" aria-hidden="true">+</span>
-              <strong>Selecionar fotos</strong>
-              <small>JPG, PNG ou HEIC</small>
+              <strong>Selecionar mídias</strong>
+              <small>Fotos ou vídeos</small>
             </label>
             <p class="upload-status" id="uploadStatus">Conectando à galeria...</p>
           </div>
 
           <div class="gallery-preview" id="galleryPreview" aria-live="polite">
             <div class="gallery-empty">
-              <strong>Nenhuma foto enviada ainda</strong>
+              <strong>Nenhuma mídia enviada ainda</strong>
               <span>As primeiras memórias da festa aparecerão aqui.</span>
             </div>
           </div>
@@ -109,7 +109,7 @@
             <div class="admin-heading">
               <div>
                 <p class="eyebrow">Área do admin</p>
-                <h3>Aprovar fotos enviadas</h3>
+                <h3>Aprovar mídias enviadas</h3>
               </div>
               <button class="admin-logout" id="adminLogout" type="button" hidden>Sair</button>
             </div>
@@ -126,7 +126,7 @@
               <button class="button primary" type="submit">Entrar</button>
             </form>
 
-            <p class="admin-status" id="adminStatus">Entre para revisar as fotos pendentes.</p>
+            <p class="admin-status" id="adminStatus">Entre para revisar as mídias pendentes.</p>
             <div class="admin-pending" id="adminPending" hidden></div>
           </div>
         </div>
