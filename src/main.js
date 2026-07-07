@@ -1,7 +1,12 @@
 import "./styles.css";
+import { createClient } from "@supabase/supabase-js";
 
 const eventStart = new Date("2026-07-18T16:00:00-03:00");
 const eventEnd = new Date("2026-07-18T20:00:00-03:00");
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseBucket = import.meta.env.VITE_SUPABASE_BUCKET || "guest-photos";
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 const units = {
   days: document.querySelector("#days"),
@@ -12,6 +17,7 @@ const units = {
 const accessYear = document.querySelector("#accessYear");
 const galleryInput = document.querySelector("#galleryInput");
 const galleryPreview = document.querySelector("#galleryPreview");
+const uploadStatus = document.querySelector("#uploadStatus");
 let galleryPhotoUrls = [];
 
 accessYear.textContent = new Date().getFullYear();
@@ -64,6 +70,97 @@ function downloadCalendarInvite() {
   URL.revokeObjectURL(link.href);
 }
 
+function setUploadStatus(message, state = "") {
+  uploadStatus.textContent = message;
+  uploadStatus.className = `upload-status${state ? ` is-${state}` : ""}`;
+}
+
+function renderGalleryEmpty(title = "Nenhuma foto enviada ainda", message = "As primeiras memórias da festa aparecerão aqui.") {
+  galleryPreview.innerHTML = `
+    <div class="gallery-empty">
+      <strong>${title}</strong>
+      <span>${message}</span>
+    </div>
+  `;
+}
+
+function renderGalleryPhoto({ url, name }) {
+  const figure = document.createElement("figure");
+  figure.className = "gallery-photo";
+
+  const image = document.createElement("img");
+  image.src = url;
+  image.alt = `Foto enviada: ${name}`;
+
+  const caption = document.createElement("figcaption");
+  caption.textContent = name;
+
+  figure.append(image, caption);
+  galleryPreview.append(figure);
+}
+
+async function loadStoredGalleryPhotos() {
+  if (!supabase) {
+    setUploadStatus("Configure a chave anon do Supabase para ativar o envio.", "error");
+    return;
+  }
+
+  const { data, error } = await supabase.storage.from(supabaseBucket).list("", {
+    limit: 100,
+    sortBy: { column: "created_at", order: "desc" },
+  });
+
+  if (error) {
+    setUploadStatus("Não foi possível carregar a galeria do Supabase.", "error");
+    renderGalleryEmpty("Galeria indisponível", "Verifique o bucket guest-photos e as políticas públicas.");
+    return;
+  }
+
+  galleryPreview.replaceChildren();
+
+  if (!data || data.length === 0) {
+    renderGalleryEmpty();
+    setUploadStatus("Galeria pronta para receber fotos.", "success");
+    return;
+  }
+
+  data
+    .filter((item) => item.name && !item.name.endsWith("/"))
+    .forEach((item) => {
+      const { data: publicPhoto } = supabase.storage.from(supabaseBucket).getPublicUrl(item.name);
+      renderGalleryPhoto({ url: publicPhoto.publicUrl, name: item.name.split("-").slice(2).join("-") || item.name });
+    });
+
+  setUploadStatus("Galeria sincronizada com Supabase.", "success");
+}
+
+async function uploadGalleryPhotos(photos) {
+  if (!supabase) {
+    setUploadStatus("Prévia local: falta configurar VITE_SUPABASE_ANON_KEY.", "error");
+    return false;
+  }
+
+  setUploadStatus(`Enviando ${photos.length} foto${photos.length > 1 ? "s" : ""}...`);
+
+  const uploads = photos.map(async (photo) => {
+    const safeName = photo.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "-");
+    const path = `${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+    const { error } = await supabase.storage.from(supabaseBucket).upload(path, photo, {
+      cacheControl: "3600",
+      upsert: false,
+    });
+
+    if (error) {
+      throw error;
+    }
+  });
+
+  await Promise.all(uploads);
+  setUploadStatus("Fotos enviadas para a galeria.", "success");
+  await loadStoredGalleryPhotos();
+  return true;
+}
+
 async function shareInvite() {
   const shareData = {
     title: "CH 1 Ano",
@@ -89,7 +186,7 @@ document.querySelector("#shareButton").addEventListener("click", () => {
   shareInvite().catch(() => {});
 });
 
-galleryInput.addEventListener("change", () => {
+galleryInput.addEventListener("change", async () => {
   galleryPhotoUrls.forEach((url) => URL.revokeObjectURL(url));
   galleryPhotoUrls = [];
   galleryPreview.replaceChildren();
@@ -97,12 +194,7 @@ galleryInput.addEventListener("change", () => {
   const selectedPhotos = [...galleryInput.files].filter((file) => file.type.startsWith("image/"));
 
   if (selectedPhotos.length === 0) {
-    galleryPreview.innerHTML = `
-      <div class="gallery-empty">
-        <strong>Nenhuma foto enviada ainda</strong>
-        <span>As primeiras memórias da festa aparecerão aqui.</span>
-      </div>
-    `;
+    renderGalleryEmpty();
     return;
   }
 
@@ -110,20 +202,16 @@ galleryInput.addEventListener("change", () => {
     const photoUrl = URL.createObjectURL(photo);
     galleryPhotoUrls.push(photoUrl);
 
-    const figure = document.createElement("figure");
-    figure.className = "gallery-photo";
-
-    const image = document.createElement("img");
-    image.src = photoUrl;
-    image.alt = `Foto enviada: ${photo.name}`;
-
-    const caption = document.createElement("figcaption");
-    caption.textContent = photo.name;
-
-    figure.append(image, caption);
-    galleryPreview.append(figure);
+    renderGalleryPhoto({ url: photoUrl, name: photo.name });
   });
+
+  try {
+    await uploadGalleryPhotos(selectedPhotos);
+  } catch (error) {
+    setUploadStatus("Erro ao enviar. Confira as permissões do bucket no Supabase.", "error");
+  }
 });
 
+loadStoredGalleryPhotos();
 updateCountdown();
 setInterval(updateCountdown, 1000);
